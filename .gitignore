@@ -1,0 +1,28 @@
+# Model weights (never redistribute; download from the original publishers)
+models/
+official/
+*.onnx
+*.bin
+
+# Reference latents are someone's actual voice — build your own, never commit
+ref/
+*.npz
+
+# Generated audio
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# Token working files
+tokens*.json
+
+# Python environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+
+# Logs and scratch
+*.log
+*.err
+work/
