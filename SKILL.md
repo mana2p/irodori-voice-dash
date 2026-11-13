@@ -62,6 +62,12 @@ Irodori-TTS v4.1-Small-MF（ONNX int8 / CPU）を単一プロセスで高速実�
 - [`scripts/join_wavs.py`](scripts/join_wavs.py) — 複数 WAV を指定ギャップで結合
 - [`scripts/download_models.py`](scripts/download_models.py) / [`scripts/download_models.ps1`](scripts/download_models.ps1) / [`scripts/download_models.sh`](scripts/download_models.sh) — ONNX モデル取得
 
+## 利用上の注意・禁止事項
+
+- **声優・キャラクター・実在人物の声の模倣禁止**：シードのランダム性を活かして好みの声を「ガチャ感覚で選ぶ」のが趣旨。固有名詞（声優名・キャラクター名等）での声寄せ要求は受け付けず、声の高さ・若々しさ・抑揚・息づかい等の特徴表現のみで設計すること（詳細は [references/voice-design.md](references/voice-design.md)）。
+- **モデル重み・`.npz` の扱い**：モデル重みや個人の参照潜在（`.npz`）は再配布・公開リポジトリへ含めない。Irodori-TTS 本体のライセンスおよび倫理的制限（同意のない他者のなりすまし禁止等）を遵守すること。
+- **透かしなし**：この ONNX 経路では透かし（SilentCipher）は入らないため、生成音声を公開する場合は AI 音声である旨の明示を推奨する。
+
 ## 詳細リファレンス（必要時のみ参照）
 
 - 環境の構築・モデルダウンロード・float 検証: [references/setup.md](references/setup.md)
