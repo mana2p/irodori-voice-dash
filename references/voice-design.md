@@ -62,3 +62,14 @@
    ```
    ※ `dacvae_encode.onnx` はサンプリング式エンコーダのため、内部で **8 回エンコードして平均**を取り、事後平均 (posterior mean) に近似する。1 回エンコードで済ませないこと。
 3. 検証としてポジティブな文とシリアスな文を `scripts/speak_long_text.py --ref-latents ref/my-voice.npz` で生成し、声の同一性と感情の切り替わりを確認する。
+
+---
+
+## 補足（上級者・裏技ルート）：`.speaker.safetensors` を直接使う場合
+
+※ 本来の「音声ガチャ → `.npz` 固定」フローとは別枠の応用オプションです（通常時は使わなくて OK）。
+
+- 公式の Speaker Inversion 形式で作成した `*.speaker.safetensors`（キー `speaker_embedding`, shape `(tokens, 768)`）がある場合、`speak_long_text.py` / `infer_onnx.py` の `--ref-embed <path.speaker.safetensors>` で `speaker_encoder.onnx` をバイパスして直接合成できます（別途 `safetensors` パッケージが必要）。
+- `--caption` 未指定時は純粋な埋め込み声質（`caption` 無効）で生成されます。
+- **利用上の注意**：本スキル標準のモデル（`Irodori-TTS-v4.1-Small-MF` / `speaker_dim=768`）向けに作成したもののみ利用可能（v3 RF 版など別世代・別方式のモデルで作ったデータは音質が破綻します）。外部配布データを使う場合は配布元の利用規約および実在人物・キャラクター模倣禁止・なりすまし禁止のルールを必ず守ること（公開リポジトリへのコミットも厳禁）。
+

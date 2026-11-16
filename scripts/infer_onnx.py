@@ -169,18 +169,54 @@ def load_sessions(models_dir: Path, variant: str = 'int8', threads: int = 2) -> 
     return sessions, timings
 
 
-def encode_caption_state(enc_sess: ort.InferenceSession, caption_ids: list[int], caption_len: int) -> tuple[np.ndarray, np.ndarray]:
+def encode_caption_state(
+    enc_sess: ort.InferenceSession,
+    caption_ids: list[int],
+    caption_len: int,
+    has_caption: bool = True,
+) -> tuple[np.ndarray, np.ndarray]:
     """Encode caption token ids once so multiple segments can reuse the state."""
     cap_ids = np.array([caption_ids], dtype=np.int64)
-    cap_mask = np.ones((1, caption_len), dtype=np.float32)
+    cap_mask = (np.ones if has_caption else np.zeros)((1, caption_len), dtype=np.float32)
     caption_state = enc_sess.run(['caption_state'], {'input_ids': cap_ids, 'mask': cap_mask})[0]
     return caption_state, cap_mask
+
+
+def load_speaker_embedding_safetensors(
+    path: str | Path,
+    expected_dim: int | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Load Speaker Inversion embedding (.speaker.safetensors) bypassing speaker_encoder."""
+    from safetensors import safe_open
+
+    with safe_open(str(path), framework='numpy') as f:
+        if 'speaker_embedding' not in f.keys():
+            raise ValueError(f"Missing 'speaker_embedding' key in {path}")
+        emb = np.asarray(f.get_tensor('speaker_embedding'), dtype=np.float32)
+
+    if emb.ndim == 2:
+        emb = emb[None, :, :]
+    elif emb.ndim != 3 or emb.shape[0] != 1:
+        raise ValueError(
+            f"speaker_embedding must have shape (tokens, dim) or (1, tokens, dim), got {emb.shape}"
+        )
+    if emb.shape[1] <= 0:
+        raise ValueError("speaker_embedding must contain at least one token")
+    if expected_dim is not None and emb.shape[2] != expected_dim:
+        raise ValueError(
+            f"speaker_embedding dim mismatch: expected {expected_dim}, got {emb.shape[2]}"
+        )
+
+    speaker_state = np.ascontiguousarray(emb, dtype=np.float32)
+    speaker_mask = np.ones((1, speaker_state.shape[1]), dtype=np.float32)
+    return speaker_state, speaker_mask
 
 
 def prepare_speaker_condition(
     sessions: dict,
     ref_latents: str | Path | None = None,
     ref_wavs: list[str] | None = None,
+    ref_embed: str | Path | None = None,
     ref_normalize_db: float = -16.0,
     ref_max_seconds: float = 120.0,
 ) -> dict:
@@ -189,6 +225,34 @@ def prepare_speaker_condition(
     ref_info = None
     ref_latent = None
     spk = sessions['spk']
+
+    if ref_latents and str(ref_latents).endswith('.speaker.safetensors'):
+        if ref_embed is not None:
+            raise ValueError("Cannot pass both .speaker.safetensors in ref_latents and ref_embed")
+        ref_embed = ref_latents
+        ref_latents = None
+
+    if ref_embed:
+        t0 = time.perf_counter()
+        out_shape = spk.get_outputs()[0].shape
+        expected_dim = out_shape[-1] if out_shape and isinstance(out_shape[-1], int) else None
+        speaker_state, speaker_mask = load_speaker_embedding_safetensors(ref_embed, expected_dim=expected_dim)
+        timings['load_speaker_embedding'] = time.perf_counter() - t0
+        has_speaker = np.ones(1, dtype=np.float32)
+        ref_info = {
+            'source': 'speaker_embedding_safetensors',
+            'path': str(ref_embed),
+            'tokens': int(speaker_state.shape[1]),
+            'speaker_dim': int(speaker_state.shape[2]),
+        }
+        return {
+            'speaker_state': speaker_state,
+            'speaker_mask': speaker_mask,
+            'has_speaker': has_speaker,
+            'ref_latent': None,
+            'ref_info': ref_info,
+            'timings': timings,
+        }
 
     if ref_latents:
         t0 = time.perf_counter()
@@ -261,10 +325,14 @@ def synthesize_waveform(
     text_mask = np.ones((1, tok['text_len']), dtype=np.float32)
     text_state = enc.run(['text_state'], {'input_ids': text_ids, 'mask': text_mask})[0]
     if precomputed_caption is None:
-        caption_state, cap_mask = encode_caption_state(enc, tok['caption_ids'], tok['caption_len'])
+        cap_has_text = not bool(tok.get('caption_empty', False))
+        caption_state, cap_mask = encode_caption_state(
+            enc, tok['caption_ids'], tok['caption_len'], has_caption=cap_has_text
+        )
         timings['encode_text+caption'] = time.perf_counter() - t0
     else:
         caption_state, cap_mask = precomputed_caption
+        cap_has_text = bool(np.any(cap_mask > 0))
         timings['encode_text'] = time.perf_counter() - t0
 
     speaker_state = speaker_cond['speaker_state']
@@ -277,7 +345,7 @@ def synthesize_waveform(
         'text_state': text_state, 'text_mask': text_mask,
         'speaker_state': speaker_state, 'has_speaker': has_speaker,
         'caption_state': caption_state, 'caption_mask': cap_mask,
-        'has_caption': np.ones(1, dtype=np.float32)})[0][0])
+        'has_caption': np.array([1.0 if cap_has_text else 0.0], dtype=np.float32)})[0][0])
     pred_frames = math.expm1(log_frames)
     latent_steps = int(round(pred_frames))
     latent_steps = max(int(math.ceil(MIN_SEC * 25)), min(int(MAX_SEC * 25), latent_steps))
@@ -385,18 +453,22 @@ def main() -> None:
     ap.add_argument('--ref-latents', default=None,
                     help='npz with pre-encoded reference latent (key "latent", '
                          'shape (1,T,32)); skips dacvae_encode. Mutually '
-                         'exclusive with --ref-wavs.')
+                         'exclusive with --ref-wavs/--ref-embed.')
+    ap.add_argument('--ref-embed', default=None,
+                    help='Speaker Inversion .speaker.safetensors file (key '
+                         '"speaker_embedding", shape (tokens, dim)); bypasses '
+                         'speaker_encoder. Mutually exclusive with --ref-wavs/--ref-latents.')
     ap.add_argument('--ref-normalize-db', type=float, default=-16.0,
                     help='per-clip loudness target in dB (official ref_normalize_db)')
     ap.add_argument('--ref-max-seconds', type=float, default=120.0,
                     help='cap on combined reference length (config ref_max_seconds)')
     args = ap.parse_args()
-    if args.ref_wavs and args.ref_latents:
-        ap.error('--ref-wavs and --ref-latents are mutually exclusive')
+    if sum(bool(x) for x in (args.ref_wavs, args.ref_latents, args.ref_embed)) > 1:
+        ap.error('--ref-wavs, --ref-latents, and --ref-embed are mutually exclusive')
 
     models_dir = Path(args.models_dir) if args.models_dir else REPO_ROOT / 'models'
     tok_path = Path(args.tokens) if args.tokens else Path('tokens.json')
-    tok = json.loads(tok_path.read_text())
+    tok = json.loads(tok_path.read_text(encoding='utf-8'))
 
     t_all = time.perf_counter()
     sessions, load_timings = load_sessions(models_dir, variant=args.variant, threads=args.threads)
@@ -404,6 +476,7 @@ def main() -> None:
         sessions,
         ref_latents=args.ref_latents,
         ref_wavs=args.ref_wavs,
+        ref_embed=args.ref_embed,
         ref_normalize_db=args.ref_normalize_db,
         ref_max_seconds=args.ref_max_seconds,
     )

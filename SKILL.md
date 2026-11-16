@@ -10,7 +10,7 @@ license: MIT
 compatibility: >-
   Requires Python 3.12, onnxruntime, numpy, soundfile, pyloudnorm, scipy,
   tokenizers, plus local Irodori-TTS ONNX models and official repo checkout.
-  Supports Windows and Linux.
+  Optional: safetensors (only for experimental --ref-embed). Supports Windows and Linux.
 ---
 
 # Irodori Voice Dash
@@ -47,6 +47,7 @@ Irodori-TTS v4.1-Small-MF（ONNX int8 / CPU）を単一プロセスで高速実�
 よく使うオプション：
 - `--text-file <path>`: 長文テキストファイルを読み込む
 - `--ref-latents <path.npz>`: 声質を固定する参照潜在を指定（未指定時は `IRODORI_REF_LATENTS` を参照）
+- `--ref-embed <path.speaker.safetensors>`: （上級者向け裏技）公式 Speaker Inversion 埋め込みを直接読む（通常の音声ガチャ向けではなく `safetensors` と `speaker_dim=768` 互換・配布規約遵守が必要。詳細は [README.md](README.md) / [references/voice-design.md](references/voice-design.md)）
 - `--caption "<caption text>"` / `--seed <int>`: キャプション・シードを指定（固定声使用時もプロジェクト設定に合わせて指定）
 - `--models-dir` / `--irodori-dir` / `--tokenizer-dir`: ランタイムの配置先を明示（既定では環境変数・`Irodori-TTS/*`・カレント配下を自動探索）
 - `--threads <int>`: ONNX Runtime スレッド数（既定は `min(6, max(2, cpu_count // 2))`）
@@ -65,7 +66,7 @@ Irodori-TTS v4.1-Small-MF（ONNX int8 / CPU）を単一プロセスで高速実�
 ## 利用上の注意・禁止事項
 
 - **声優・キャラクター・実在人物の声の模倣禁止**：シードのランダム性を活かして好みの声を「ガチャ感覚で選ぶ」のが趣旨。固有名詞（声優名・キャラクター名等）での声寄せ要求は受け付けず、声の高さ・若々しさ・抑揚・息づかい等の特徴表現のみで設計すること（詳細は [references/voice-design.md](references/voice-design.md)）。
-- **モデル重み・`.npz` の扱い**：モデル重みや個人の参照潜在（`.npz`）は再配布・公開リポジトリへ含めない。Irodori-TTS 本体のライセンスおよび倫理的制限（同意のない他者のなりすまし禁止等）を遵守すること。
+- **モデル重み・`.npz` / `.safetensors` の扱い**：モデル重みや個人の参照潜在（`.npz`）・外部 Speaker Inversion データ（`.speaker.safetensors`）は再配布・公開リポジトリへ含めない。Irodori-TTS 本体および各データ配布元のライセンス・倫理的制限（同意のない他者のなりすまし禁止等）を遵守すること。
 - **透かしなし**：この ONNX 経路では透かし（SilentCipher）は入らないため、生成音声を公開する場合は AI 音声である旨の明示を推奨する。
 
 ## 詳細リファレンス（必要時のみ参照）

@@ -115,11 +115,20 @@ def main():
     group.add_argument("--text-file", help="Path to text file to speak")
 
     ap.add_argument("--out", required=True, help="Output wav file path")
-    ap.add_argument("--caption", default=DEFAULT_CAPTION, help="Voice caption")
+    ap.add_argument(
+        "--caption",
+        default=None,
+        help="Voice caption (default: empty when --ref-embed/--ref-latents is set, else neutral sample)",
+    )
     ap.add_argument(
         "--ref-latents",
         default=os.environ.get("IRODORI_REF_LATENTS"),
         help="Optional reference latent npz (default: IRODORI_REF_LATENTS env if set)",
+    )
+    ap.add_argument(
+        "--ref-embed",
+        default=os.environ.get("IRODORI_REF_EMBED"),
+        help="Optional Speaker Inversion .speaker.safetensors (default: IRODORI_REF_EMBED env if set)",
     )
     ap.add_argument("--seed", type=int, default=DEFAULT_SEED, help="Random seed")
     ap.add_argument("--variant", choices=("int8", "f32"), default="int8", help="ONNX model variant")
@@ -137,6 +146,14 @@ def main():
     ap.add_argument("--keep-parts", action="store_true", help="Keep part wav files")
 
     args = ap.parse_args()
+
+    if args.ref_latents and args.ref_embed:
+        ap.error("--ref-latents and --ref-embed are mutually exclusive")
+
+    caption = args.caption
+    if caption is None:
+        caption = "" if (args.ref_latents or args.ref_embed) else DEFAULT_CAPTION
+    has_caption = bool(caption.strip())
 
     if args.text_file:
         text = Path(args.text_file).read_text(encoding="utf-8")
@@ -162,12 +179,12 @@ def main():
         Path(args.irodori_dir).resolve(),
         str(Path(tokenizer_dir).resolve()) if tokenizer_dir else None,
     )
-    pre_caption_ids = tok_bundle.encode_caption(args.caption)
+    pre_caption_ids = tok_bundle.encode_caption(caption)
     tokenized_segments = [
         tokenize_segment(
             tok_bundle,
             seg,
-            args.caption,
+            caption,
             precomputed_caption=pre_caption_ids,
             include_duration_features=False,
         )
@@ -179,7 +196,9 @@ def main():
     sessions, load_timings = load_sessions(models_dir, variant=args.variant, threads=args.threads)
 
     cap_ids_list, cap_len = pre_caption_ids
-    precomputed_caption_state = encode_caption_state(sessions["enc"], cap_ids_list, cap_len)
+    precomputed_caption_state = encode_caption_state(
+        sessions["enc"], cap_ids_list, cap_len, has_caption=has_caption
+    )
 
     ref_latents_path = None
     if args.ref_latents:
@@ -189,7 +208,19 @@ def main():
         else:
             print(f"Warning: ref-latents {candidate} not found. Running without ref.")
 
-    speaker_cond = prepare_speaker_condition(sessions, ref_latents=ref_latents_path)
+    ref_embed_path = None
+    if args.ref_embed:
+        candidate = Path(args.ref_embed).resolve()
+        if candidate.exists():
+            ref_embed_path = candidate
+        else:
+            print(f"Warning: ref-embed {candidate} not found. Running without ref.")
+
+    speaker_cond = prepare_speaker_condition(
+        sessions,
+        ref_latents=ref_latents_path,
+        ref_embed=ref_embed_path,
+    )
 
     # 3. Synthesize each segment in-process
     out_path = Path(args.out).resolve()

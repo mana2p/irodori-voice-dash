@@ -4,9 +4,10 @@ official/
 *.onnx
 *.bin
 
-# Reference latents are someone's actual voice — build your own, never commit
+# Reference latents / speaker embeddings are someone's actual voice — build your own, never commit
 ref/
 *.npz
+*.safetensors
 
 # Generated audio
 *.wav
@@ -26,3 +27,4 @@ __pycache__/
 *.log
 *.err
 work/
+

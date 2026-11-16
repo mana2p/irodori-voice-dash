@@ -98,6 +98,26 @@ git clone https://github.com/Aratako/Irodori-TTS.git ./official
   --models-dir ./models --clips take_101.wav --out ref/my-voice.npz
 ```
 
+### 3. 【上級者向け・裏技】Speaker Inversion（`.speaker.safetensors`）を使う場合
+
+> ⚠️ **注意（本来の想定外の機能です）**：
+> 本スキルの本来の目的は、上の **「音声ガチャで好みの声を引き当て、`make_ref_latents.py` で `.npz` として固定する」** 使い方であり、一般の音声ガチャ向け機能ではありません。
+> 公式または事前学習済みの **Speaker Inversion 埋め込みファイル（`.speaker.safetensors`）** をすでに手元に持っている場合の **裏技的な応用ルート** として、`--ref-embed`（環境変数 `IRODORI_REF_EMBED`）による読み込みにも対応しています。利用時は以下に注意してください：
+>
+> - 追加で `safetensors` パッケージが必要です（`uv pip install safetensors`）。
+> - `Irodori-TTS-v4.1-Small-MF`（`speaker_dim=768`）向けに作成された埋め込みのみ使用できます（**v3 RF 版など別世代・別方式のモデルで作った `.speaker.safetensors` を流用すると次元一致しても音声が破綻します**）。
+> - `--caption` を省略すると純粋に埋め込み側の声だけで合成されます（`caption_mask=0`）。
+> - 第三者が配布している `.speaker.safetensors` 等を扱う場合は、**配布元のライセンス・利用規約および「同意のない他者のなりすまし・特定人物の模倣禁止」の規約を必ず遵守** してください（無断利用・公開は厳禁、`.speaker.safetensors` も公開リポジトリへ含めないでください）。
+
+```bash
+.venv/bin/python scripts/speak_long_text.py \
+  --models-dir ./models \
+  --irodori-dir ./official \
+  --ref-embed ref/custom.speaker.safetensors \
+  --text "サンプルボイスのテスト音声です。" \
+  --out sample.wav
+```
+
 ### 主要パラメータ決定値
 
 | パラメータ | 値 | 根拠 |
