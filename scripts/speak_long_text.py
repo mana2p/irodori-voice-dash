@@ -156,7 +156,7 @@ def main():
     has_caption = bool(caption.strip())
 
     if args.text_file:
-        text = Path(args.text_file).read_text(encoding="utf-8")
+        text = Path(args.text_file).read_text(encoding="utf-8-sig")
     else:
         text = args.text
 

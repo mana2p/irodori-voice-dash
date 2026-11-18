@@ -4,7 +4,7 @@
 
 Antigravity・Claude Code・OpenAI Codex・Cursor・VS Code（GitHub Copilot）など主要 AI コーディングエージェント／エディタで共通利用できます。
 
-> エージェント向け手順書は [SKILL.md](SKILL.md)、詳細リファレンスは [references/setup.md](references/setup.md) / [references/voice-design.md](references/voice-design.md) / [references/troubleshooting.md](references/troubleshooting.md)、実験記録は [docs/findings.md](docs/findings.md) を参照してください。
+> エージェント向け手順書は [SKILL.md](SKILL.md)、詳細リファレンスは [references/setup.md](references/setup.md) / [references/voice-design.md](references/voice-design.md) / [references/EMOJI_ANNOTATIONS.md](references/EMOJI_ANNOTATIONS.md) / [references/troubleshooting.md](references/troubleshooting.md)、実験記録は [docs/findings.md](docs/findings.md) を参照してください。
 
 ## 特徴
 
@@ -62,6 +62,8 @@ git clone https://github.com/Aratako/Irodori-TTS.git ./official
 ```
 
 固定声（`.npz`）を使う場合は `--ref-latents`（または環境変数 `IRODORI_REF_LATENTS`）を指定します：
+
+※ 感情・話し方・効果音を制御したい場合は、対応絵文字を **文頭または文中** に挿入します（同じ絵文字を重ねると強調、自動文分割との干渉を防ぐため「。」の直後は避けてください。一覧は [references/EMOJI_ANNOTATIONS.md](references/EMOJI_ANNOTATIONS.md) を参照）。
 
 ```bash
 .venv/bin/python scripts/speak_long_text.py \

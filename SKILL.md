@@ -73,5 +73,6 @@ Irodori-TTS v4.1-Small-MF（ONNX int8 / CPU）を単一プロセスで高速実�
 
 - 環境の構築・モデルダウンロード・float 検証: [references/setup.md](references/setup.md)
 - 新しい声の設計・5案ガチャ選定・参照潜在の固定: [references/voice-design.md](references/voice-design.md)
+- 絵文字による感情表現・話し方・効果音アノテーション一覧（文頭または文中に挿入、`。` の直後は避ける）: [references/EMOJI_ANNOTATIONS.md](references/EMOJI_ANNOTATIONS.md)
 - パラメータ根拠・トラブルシューティング・倫理規約: [references/troubleshooting.md](references/troubleshooting.md)
 - ベンチマーク・設計知見の詳細: [docs/findings.md](docs/findings.md)
